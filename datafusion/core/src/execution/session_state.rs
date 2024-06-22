@@ -768,6 +768,11 @@ impl SessionState {
         &self.execution_props
     }
 
+    /// Return the table functions
+    pub fn table_functions(&self) -> &HashMap<String, Arc<TableFunction>> {
+        &self.table_functions
+    }
+
     /// Return mutable execution properties
     pub fn execution_props_mut(&mut self) -> &mut ExecutionProps {
         &mut self.execution_props
