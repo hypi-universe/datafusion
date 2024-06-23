@@ -61,11 +61,11 @@ use sqlparser::ast::{
 };
 use sqlparser::parser::ParserError::ParserError;
 
-fn ident_to_string(ident: &Ident) -> String {
+pub fn ident_to_string(ident: &Ident) -> String {
     normalize_ident(ident.to_owned())
 }
 
-fn value_to_string(value: &Value) -> Option<String> {
+pub fn value_to_string(value: &Value) -> Option<String> {
     match value {
         Value::SingleQuotedString(s) => Some(s.to_string()),
         Value::DollarQuotedString(s) => Some(s.to_string()),
@@ -89,7 +89,7 @@ fn value_to_string(value: &Value) -> Option<String> {
     }
 }
 
-fn object_name_to_string(object_name: &ObjectName) -> String {
+pub fn object_name_to_string(object_name: &ObjectName) -> String {
     object_name
         .0
         .iter()
@@ -98,7 +98,7 @@ fn object_name_to_string(object_name: &ObjectName) -> String {
         .join(".")
 }
 
-fn get_schema_name(schema_name: &SchemaName) -> String {
+pub fn get_schema_name(schema_name: &SchemaName) -> String {
     match schema_name {
         SchemaName::Simple(schema_name) => object_name_to_string(schema_name),
         SchemaName::UnnamedAuthorization(auth) => ident_to_string(auth),
@@ -859,7 +859,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
         }))
     }
 
-    fn copy_to_plan(&self, statement: CopyToStatement) -> Result<LogicalPlan> {
+    pub fn copy_to_plan(&self, statement: CopyToStatement) -> Result<LogicalPlan> {
         // determine if source is table or query and handle accordingly
         let copy_source = statement.source;
         let (input, input_schema, table_ref) = match copy_source {
@@ -978,7 +978,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
     }
 
     /// Generate a logical plan from a CREATE EXTERNAL TABLE statement
-    fn external_table_to_plan(
+    pub fn external_table_to_plan(
         &self,
         statement: CreateExternalTable,
     ) -> Result<LogicalPlan> {
@@ -1079,7 +1079,7 @@ impl<'a, S: ContextProvider> SqlToRel<'a, S> {
     ///
     /// Note this is the sqlparser explain statement, not the
     /// datafusion `EXPLAIN` statement.
-    fn explain_to_plan(
+    pub fn explain_to_plan(
         &self,
         verbose: bool,
         analyze: bool,
