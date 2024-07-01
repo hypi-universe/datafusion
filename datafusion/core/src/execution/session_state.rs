@@ -794,7 +794,7 @@ impl SessionState {
     }
 
     /// Return the optimizers
-    pub fn optimizers(&self) -> &[Arc<dyn PhysicalOptimizerRule + Send + Sync>] {
+    pub fn optimizers(&self) -> &[Arc<dyn OptimizerRule + Send + Sync>] {
         &self.optimizer.rules
     }
 
