@@ -793,6 +793,11 @@ impl SessionState {
         &self.physical_optimizers.rules
     }
 
+    /// Return the optimizers
+    pub fn optimizers(&self) -> &[Arc<dyn PhysicalOptimizerRule + Send + Sync>] {
+        &self.optimizer.rules
+    }
+
     /// return the configuration options
     pub fn config_options(&self) -> &ConfigOptions {
         self.config.options()
