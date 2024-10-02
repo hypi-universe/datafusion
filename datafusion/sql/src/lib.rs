@@ -42,7 +42,7 @@ mod query;
 mod relation;
 mod select;
 mod set_expr;
-mod statement;
+pub mod statement;
 #[cfg(feature = "unparser")]
 pub mod unparser;
 pub mod utils;

@@ -104,11 +104,11 @@ use uuid::Uuid;
 /// # #[tokio::main]
 /// # async fn main() -> Result<()> {
 ///     let state = SessionStateBuilder::new()
-///         .with_config(SessionConfig::new())  
+///         .with_config(SessionConfig::new())
 ///         .with_runtime_env(Arc::new(RuntimeEnv::default()))
 ///         .with_default_features()
 ///         .build();
-///     Ok(())  
+///     Ok(())
 /// # }
 /// ```
 ///
@@ -311,7 +311,7 @@ impl SessionState {
             .resolve(&catalog.default_catalog, &catalog.default_schema)
     }
 
-    pub(crate) fn schema_for_ref(
+    pub fn schema_for_ref(
         &self,
         table_ref: impl Into<TableReference>,
     ) -> datafusion_common::Result<Arc<dyn SchemaProvider>> {
