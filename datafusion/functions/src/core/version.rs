@@ -17,11 +17,14 @@
 
 //! [`VersionFunc`]: Implementation of the `version` function.
 
-use std::any::Any;
-
 use arrow::datatypes::DataType;
 use datafusion_common::{not_impl_err, plan_err, Result, ScalarValue};
-use datafusion_expr::{ColumnarValue, ScalarUDFImpl, Signature, Volatility};
+use datafusion_expr::scalar_doc_sections::DOC_SECTION_OTHER;
+use datafusion_expr::{
+    ColumnarValue, Documentation, ScalarUDFImpl, Signature, Volatility,
+};
+use std::any::Any;
+use std::sync::OnceLock;
 
 #[derive(Debug)]
 pub struct VersionFunc {
@@ -78,6 +81,33 @@ impl ScalarUDFImpl for VersionFunc {
         );
         Ok(ColumnarValue::Scalar(ScalarValue::Utf8(Some(version))))
     }
+
+    fn documentation(&self) -> Option<&Documentation> {
+        Some(get_version_doc())
+    }
+}
+
+static DOCUMENTATION: OnceLock<Documentation> = OnceLock::new();
+
+fn get_version_doc() -> &'static Documentation {
+    DOCUMENTATION.get_or_init(|| {
+        Documentation::builder()
+            .with_doc_section(DOC_SECTION_OTHER)
+            .with_description("Returns the version of DataFusion.")
+            .with_syntax_example("version()")
+            .with_sql_example(
+                r#"```sql
+> select version();
++--------------------------------------------+
+| version()                                  |
++--------------------------------------------+
+| Apache DataFusion 42.0.0, aarch64 on macos |
++--------------------------------------------+
+```"#,
+            )
+            .build()
+            .unwrap()
+    })
 }
 
 #[cfg(test)]
@@ -88,7 +118,7 @@ mod test {
     #[tokio::test]
     async fn test_version_udf() {
         let version_udf = ScalarUDF::from(VersionFunc::new());
-        let version = version_udf.invoke_no_args(0).unwrap();
+        let version = version_udf.invoke_batch(&[], 1).unwrap();
 
         if let ColumnarValue::Scalar(ScalarValue::Utf8(Some(version))) = version {
             assert!(version.starts_with("Apache DataFusion"));

@@ -46,6 +46,7 @@ use datafusion_common::{
     exec_err, not_impl_err, DataFusionError, GetExt, DEFAULT_CSV_EXTENSION,
 };
 use datafusion_execution::TaskContext;
+use datafusion_expr::dml::InsertOp;
 use datafusion_physical_expr::PhysicalExpr;
 use datafusion_physical_plan::metrics::MetricsSet;
 
@@ -77,7 +78,7 @@ impl CsvFormatFactory {
     }
 }
 
-impl fmt::Debug for CsvFormatFactory {
+impl Debug for CsvFormatFactory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CsvFormatFactory")
             .field("options", &self.options)
@@ -324,7 +325,13 @@ impl FileFormat for CsvFormat {
             let stream = self.read_to_delimited_chunks(store, object).await;
             let (schema, records_read) = self
                 .infer_schema_from_stream(state, records_to_read, stream)
-                .await?;
+                .await
+                .map_err(|err| {
+                    DataFusionError::Context(
+                        format!("Error when processing CSV file {}", &object.location),
+                        Box::new(err),
+                    )
+                })?;
             records_to_read -= records_read;
             schemas.push(schema);
             if records_to_read == 0 {
@@ -382,7 +389,7 @@ impl FileFormat for CsvFormat {
         conf: FileSinkConfig,
         order_requirements: Option<LexRequirement>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        if conf.overwrite {
+        if conf.insert_op != InsertOp::Append {
             return not_impl_err!("Overwrites are not implemented yet for CSV");
         }
 
@@ -432,11 +439,13 @@ impl CsvFormat {
         let mut total_records_read = 0;
         let mut column_names = vec![];
         let mut column_type_possibilities = vec![];
-        let mut first_chunk = true;
+        let mut record_number = -1;
 
         pin_mut!(stream);
 
         while let Some(chunk) = stream.next().await.transpose()? {
+            record_number += 1;
+            let first_chunk = record_number == 0;
             let mut format = arrow::csv::reader::Format::default()
                 .with_header(
                     first_chunk
@@ -445,7 +454,12 @@ impl CsvFormat {
                             .has_header
                             .unwrap_or(state.config_options().catalog.has_header),
                 )
-                .with_delimiter(self.options.delimiter);
+                .with_delimiter(self.options.delimiter)
+                .with_quote(self.options.quote);
+
+            if let Some(escape) = self.options.escape {
+                format = format.with_escape(escape);
+            }
 
             if let Some(comment) = self.options.comment {
                 format = format.with_comment(comment);
@@ -470,14 +484,14 @@ impl CsvFormat {
                         (field.name().clone(), possibilities)
                     })
                     .unzip();
-                first_chunk = false;
             } else {
                 if fields.len() != column_type_possibilities.len() {
                     return exec_err!(
                             "Encountered unequal lengths between records on CSV file whilst inferring schema. \
-                             Expected {} records, found {} records",
+                             Expected {} fields, found {} fields at record {}",
                             column_type_possibilities.len(),
-                            fields.len()
+                            fields.len(),
+                            record_number + 1
                         );
                 }
 
@@ -770,7 +784,7 @@ mod tests {
                 "c7: Int64",
                 "c8: Int64",
                 "c9: Int64",
-                "c10: Int64",
+                "c10: Utf8",
                 "c11: Float64",
                 "c12: Float64",
                 "c13: Utf8"
@@ -858,6 +872,55 @@ mod tests {
         Ok(())
     }
 
+    #[tokio::test]
+    async fn test_infer_schema_escape_chars() -> Result<()> {
+        let session_ctx = SessionContext::new();
+        let state = session_ctx.state();
+        let variable_object_store = Arc::new(VariableStream::new(
+            Bytes::from(
+                r#"c1,c2,c3,c4
+0.3,"Here, is a comma\"",third,3
+0.31,"double quotes are ok, "" quote",third again,9
+0.314,abc,xyz,27"#,
+            ),
+            1,
+        ));
+        let object_meta = ObjectMeta {
+            location: Path::parse("/")?,
+            last_modified: DateTime::default(),
+            size: usize::MAX,
+            e_tag: None,
+            version: None,
+        };
+
+        let num_rows_to_read = 3;
+        let csv_format = CsvFormat::default()
+            .with_has_header(true)
+            .with_schema_infer_max_rec(num_rows_to_read)
+            .with_quote(b'"')
+            .with_escape(Some(b'\\'));
+
+        let inferred_schema = csv_format
+            .infer_schema(
+                &state,
+                &(variable_object_store.clone() as Arc<dyn ObjectStore>),
+                &[object_meta],
+            )
+            .await?;
+
+        let actual_fields: Vec<_> = inferred_schema
+            .fields()
+            .iter()
+            .map(|f| format!("{}: {:?}", f.name(), f.data_type()))
+            .collect();
+
+        assert_eq!(
+            vec!["c1: Float64", "c2: Utf8", "c3: Utf8", "c4: Int64",],
+            actual_fields
+        );
+        Ok(())
+    }
+
     #[rstest(
         file_compression_type,
         case(FileCompressionType::UNCOMPRESSED),
@@ -906,7 +969,7 @@ mod tests {
             Field::new("c7", DataType::Int64, true),
             Field::new("c8", DataType::Int64, true),
             Field::new("c9", DataType::Int64, true),
-            Field::new("c10", DataType::Int64, true),
+            Field::new("c10", DataType::Utf8, true),
             Field::new("c11", DataType::Float64, true),
             Field::new("c12", DataType::Float64, true),
             Field::new("c13", DataType::Utf8, true),
@@ -967,7 +1030,7 @@ mod tests {
         limit: Option<usize>,
         has_header: bool,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let root = format!("{}/csv", crate::test_util::arrow_test_data());
+        let root = format!("{}/csv", arrow_test_data());
         let format = CsvFormat::default().with_has_header(has_header);
         scan_format(state, &format, &root, file_name, projection, limit).await
     }

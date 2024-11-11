@@ -31,6 +31,7 @@ mod unnest;
 pub mod alias;
 pub mod cast;
 pub mod config;
+pub mod cse;
 pub mod display;
 pub mod error;
 pub mod file_options;
@@ -43,6 +44,7 @@ pub mod scalar;
 pub mod stats;
 pub mod test_util;
 pub mod tree_node;
+pub mod types;
 pub mod utils;
 
 /// Reexport arrow crate
@@ -70,7 +72,7 @@ pub use scalar::{ScalarType, ScalarValue};
 pub use schema_reference::SchemaReference;
 pub use stats::{ColumnStatistics, Statistics};
 pub use table_reference::{ResolvedTableReference, TableReference};
-pub use unnest::UnnestOptions;
+pub use unnest::{RecursionUnnestOption, UnnestOptions};
 pub use utils::project_schema;
 
 // These are hidden from docs purely to avoid polluting the public view of what this crate exports.

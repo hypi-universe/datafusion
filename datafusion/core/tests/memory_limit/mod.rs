@@ -238,15 +238,15 @@ async fn sort_preserving_merge() {
             // SortPreservingMergeExec (not a Sort which would compete
             // with the SortPreservingMergeExec for memory)
             &[
-                "+---------------+-----------------------------------------------------------------------------------------------------------+",
-                "| plan_type     | plan                                                                                                      |",
-                "+---------------+-----------------------------------------------------------------------------------------------------------+",
-                "| logical_plan  | Sort: t.a ASC NULLS LAST, t.b ASC NULLS LAST, fetch=10                                                    |",
-                "|               |   TableScan: t projection=[a, b]                                                                          |",
-                "| physical_plan | SortPreservingMergeExec: [a@0 ASC NULLS LAST,b@1 ASC NULLS LAST], fetch=10                                |",
-                "|               |   MemoryExec: partitions=2, partition_sizes=[5, 5], output_ordering=a@0 ASC NULLS LAST,b@1 ASC NULLS LAST |",
-                "|               |                                                                                                           |",
-                "+---------------+-----------------------------------------------------------------------------------------------------------+",
+                "+---------------+------------------------------------------------------------------------------------------------------------+",
+                "| plan_type     | plan                                                                                                       |",
+                "+---------------+------------------------------------------------------------------------------------------------------------+",
+                "| logical_plan  | Sort: t.a ASC NULLS LAST, t.b ASC NULLS LAST, fetch=10                                                     |",
+                "|               |   TableScan: t projection=[a, b]                                                                           |",
+                "| physical_plan | SortPreservingMergeExec: [a@0 ASC NULLS LAST, b@1 ASC NULLS LAST], fetch=10                                |",
+                "|               |   MemoryExec: partitions=2, partition_sizes=[5, 5], output_ordering=a@0 ASC NULLS LAST, b@1 ASC NULLS LAST |",
+                "|               |                                                                                                            |",
+                "+---------------+------------------------------------------------------------------------------------------------------------+",
             ]
         )
         .run()
@@ -281,15 +281,15 @@ async fn sort_spill_reservation() {
             // also merge, so we can ensure the sort could finish
             // given enough merging memory
             &[
-                "+---------------+--------------------------------------------------------------------------------------------------------+",
-                "| plan_type     | plan                                                                                                   |",
-                "+---------------+--------------------------------------------------------------------------------------------------------+",
-                "| logical_plan  | Sort: t.a ASC NULLS LAST, t.b DESC NULLS FIRST                                                         |",
-                "|               |   TableScan: t projection=[a, b]                                                                       |",
-                "| physical_plan | SortExec: expr=[a@0 ASC NULLS LAST,b@1 DESC], preserve_partitioning=[false]                            |",
-                "|               |   MemoryExec: partitions=1, partition_sizes=[5], output_ordering=a@0 ASC NULLS LAST,b@1 ASC NULLS LAST |",
-                "|               |                                                                                                        |",
-                "+---------------+--------------------------------------------------------------------------------------------------------+",
+                "+---------------+---------------------------------------------------------------------------------------------------------+",
+                "| plan_type     | plan                                                                                                    |",
+                "+---------------+---------------------------------------------------------------------------------------------------------+",
+                "| logical_plan  | Sort: t.a ASC NULLS LAST, t.b DESC NULLS FIRST                                                          |",
+                "|               |   TableScan: t projection=[a, b]                                                                        |",
+                "| physical_plan | SortExec: expr=[a@0 ASC NULLS LAST, b@1 DESC], preserve_partitioning=[false]                            |",
+                "|               |   MemoryExec: partitions=1, partition_sizes=[5], output_ordering=a@0 ASC NULLS LAST, b@1 ASC NULLS LAST |",
+                "|               |                                                                                                         |",
+                "+---------------+---------------------------------------------------------------------------------------------------------+",
             ]
         );
 
@@ -654,7 +654,7 @@ impl Scenario {
                     descending: false,
                     nulls_first: false,
                 };
-                let sort_information = vec![vec![
+                let sort_information = vec![LexOrdering::new(vec![
                     PhysicalSortExpr {
                         expr: col("a", &schema).unwrap(),
                         options,
@@ -663,7 +663,7 @@ impl Scenario {
                         expr: col("b", &schema).unwrap(),
                         options,
                     },
-                ]];
+                ])];
 
                 let table = SortedTableProvider::new(batches, sort_information);
                 Arc::new(table)
@@ -777,6 +777,7 @@ fn batches_byte_size(batches: &[RecordBatch]) -> usize {
     batches.iter().map(|b| b.get_array_memory_size()).sum()
 }
 
+#[derive(Debug)]
 struct DummyStreamPartition {
     schema: SchemaRef,
     batches: Vec<RecordBatch>,
@@ -798,6 +799,7 @@ impl PartitionStream for DummyStreamPartition {
 }
 
 ///  Wrapper over a TableProvider that can provide ordering information
+#[derive(Debug)]
 struct SortedTableProvider {
     schema: SchemaRef,
     batches: Vec<Vec<RecordBatch>>,
@@ -838,7 +840,7 @@ impl TableProvider for SortedTableProvider {
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let mem_exec =
             MemoryExec::try_new(&self.batches, self.schema(), projection.cloned())?
-                .with_sort_information(self.sort_information.clone());
+                .try_with_sort_information(self.sort_information.clone())?;
 
         Ok(Arc::new(mem_exec))
     }

@@ -107,7 +107,7 @@ impl std::fmt::Display for Column {
 
 impl PhysicalExpr for Column {
     /// Return a reference to Any that can be used for downcasting
-    fn as_any(&self) -> &dyn std::any::Any {
+    fn as_any(&self) -> &dyn Any {
         self
     }
 
@@ -163,7 +163,10 @@ impl Column {
             internal_err!(
                 "PhysicalExpr Column references column '{}' at index {} (zero-based) but input schema only has {} columns: {:?}",
                 self.name,
-                self.index, input_schema.fields.len(), input_schema.fields().iter().map(|f| f.name().clone()).collect::<Vec<String>>())
+                self.index,
+                input_schema.fields.len(),
+                input_schema.fields().iter().map(|f| f.name()).collect::<Vec<_>>()
+            )
         }
     }
 }
