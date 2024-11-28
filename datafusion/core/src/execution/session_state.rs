@@ -825,9 +825,9 @@ impl SessionState {
         overwrite: bool,
     ) -> Result<(), DataFusionError> {
         let ext = file_format.get_ext().to_lowercase();
-        match (self.file_formats.entry(ext.clone()), overwrite){
-            (Entry::Vacant(e), _) => {e.insert(file_format);},
-            (Entry::Occupied(mut e), true)  => {e.insert(file_format);},
+        match (self.file_formats.entry(ext.clone()), overwrite) {
+            (Entry::Vacant(e), _) => { e.insert(file_format); }
+            (Entry::Occupied(mut e), true) => { e.insert(file_format); }
             (Entry::Occupied(_), false) => return config_err!("File type already registered for extension {ext}. Set overwrite to true to replace this extension."),
         };
         Ok(())
@@ -1249,7 +1249,7 @@ impl SessionStateBuilder {
     /// let url = Url::try_from("file://").unwrap();
     /// let object_store = object_store::local::LocalFileSystem::new();
     /// let state = SessionStateBuilder::new()
-    ///     .with_config(SessionConfig::new())  
+    ///     .with_config(SessionConfig::new())
     ///     .with_object_store(&url, Arc::new(object_store))
     ///     .with_default_features()
     ///     .build();
@@ -1301,7 +1301,7 @@ impl SessionStateBuilder {
         } = self;
 
         let config = config.unwrap_or_default();
-        let runtime_env = runtime_env.unwrap_or(Arc::new(RuntimeEnv::default()));
+        let runtime_env = runtime_env.unwrap_or_else(|| Arc::new(RuntimeEnv::default()));
 
         let mut state = SessionState {
             session_id: session_id.unwrap_or(Uuid::new_v4().to_string()),
@@ -1309,19 +1309,19 @@ impl SessionStateBuilder {
             expr_planners: expr_planners.unwrap_or_default(),
             optimizer: optimizer.unwrap_or_default(),
             physical_optimizers: physical_optimizers.unwrap_or_default(),
-            query_planner: query_planner.unwrap_or(Arc::new(DefaultQueryPlanner {})),
+            query_planner: query_planner.unwrap_or_else(|| Arc::new(DefaultQueryPlanner {})),
             catalog_list: catalog_list
-                .unwrap_or(Arc::new(MemoryCatalogProviderList::new())
+                .unwrap_or_else(|| Arc::new(MemoryCatalogProviderList::new())
                     as Arc<dyn CatalogProviderList>),
             table_functions: table_functions.unwrap_or_default(),
             scalar_functions: HashMap::new(),
             aggregate_functions: HashMap::new(),
             window_functions: HashMap::new(),
             serializer_registry: serializer_registry
-                .unwrap_or(Arc::new(EmptySerializerRegistry)),
+                .unwrap_or_else(|| Arc::new(EmptySerializerRegistry)),
             file_formats: HashMap::new(),
             table_options: table_options
-                .unwrap_or(TableOptions::default_from_session_config(config.options())),
+                .unwrap_or_else(|| TableOptions::default_from_session_config(config.options())),
             config,
             execution_props: execution_props.unwrap_or_default(),
             table_factories: table_factories.unwrap_or_default(),
